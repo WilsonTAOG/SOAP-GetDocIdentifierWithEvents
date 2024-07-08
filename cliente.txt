@@ -1,0 +1,68 @@
+import requests
+import xml.etree.ElementTree as ET
+
+def create_soap_request(contributor_code, date_number):
+    soap_request = f"""
+    <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:wcf="http://wcf.dian.colombia">
+        <soap:Header/>
+        <soap:Body>
+            <wcf:GetDocIdentifierWithEvents>
+                <wcf:contributorCode>{contributor_code}</wcf:contributorCode>
+                <wcf:dateNumber>{date_number}</wcf:dateNumber>
+            </wcf:GetDocIdentifierWithEvents>
+        </soap:Body>
+    </soap:Envelope>
+    """
+    return soap_request
+
+def send_soap_request(contributor_code, date_number):
+    # URL del servicio SOAP de la DIAN
+    url = "https://vpfe-hab.dian.gov.co/WcfDianCustomerServices.svc?wsdl"
+
+    # Cabeceras de la solicitud
+    headers = {
+        'Content-Type': 'application/soap+xml; charset=utf-8',
+        'Authorization': 'Bearer TU_TOKEN_DE_ACCESO'  # Asegúrate de reemplazar con tu token de acceso válido
+    }
+
+    # Crear la solicitud SOAP
+    soap_request = create_soap_request(contributor_code, date_number)
+
+    # Enviar la solicitud
+    response = requests.post(url, headers=headers, data=soap_request)
+
+    # Procesar la respuesta
+    if response.status_code == 200:
+        response_xml = response.text
+        # Aquí podrías usar una biblioteca como xml.etree.ElementTree para parsear el XML de la respuesta
+        print(response_xml)
+        return response_xml
+    else:
+        print(f"Error: {response.status_code}")
+        print(response.text)
+        return None
+
+def parse_soap_response(response_xml):
+    # Parsear el XML de la respuesta
+    root = ET.fromstring(response_xml)
+    namespace = {'soap': 'http://www.w3.org/2003/05/soap-envelope', 'wcf': 'http://wcf.dian.colombia'}
+
+    track_id = root.find('.//wcf:TrackId', namespace)
+    events = root.findall('.//wcf:Event', namespace)
+
+    if track_id is not None:
+        print(f"TrackId: {track_id.text}")
+
+    for event in events:
+        event_type = event.find('wcf:EventType', namespace).text
+        event_date = event.find('wcf:EventDate', namespace).text
+        event_details = event.find('wcf:EventDetails', namespace).text
+        print(f"EventType: {event_type}, EventDate: {event_date}, EventDetails: {event_details}")
+
+# Ejemplo de uso
+contributor_code = "123456"
+date_number = "20240101"
+
+response_xml = send_soap_request(contributor_code, date_number)
+if response_xml:
+    parse_soap_response(response_xml)
